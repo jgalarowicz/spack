@@ -32,10 +32,11 @@ import llnl.util.tty as tty
 from llnl.util.lang import match_predicate
 from llnl.util.filesystem import force_remove
 
-import spack
-from spack import *
-from spack.util.prefix import Prefix
+import spack.store
 import spack.util.spack_json as sjson
+from spack.util.environment import is_system_path
+from spack.util.prefix import Prefix
+from spack import *
 
 
 class Python(AutotoolsPackage):
@@ -46,6 +47,7 @@ class Python(AutotoolsPackage):
     list_url = "https://www.python.org/downloads/"
     list_depth = 1
 
+    version('3.6.5', 'ab25d24b1f8cc4990ade979f6dc37883')
     version('3.6.4', '9de6494314ea199e3633211696735f65')
     version('3.6.3', 'e9180c69ed9a878a4a8a3ab221e32fa9')
     version('3.6.2', 'e1a36bfffdd1d3a780b1825daf16e56c')
@@ -58,7 +60,8 @@ class Python(AutotoolsPackage):
     version('3.3.6', 'cdb3cd08f96f074b3f3994ccb51063e9')
     version('3.2.6', '23815d82ae706e9b781ca65865353d39')
     version('3.1.5', '02196d3fc7bc76bdda68aa36b0dd16ab')
-    version('2.7.14', 'cee2e4b33ad3750da77b2e85f2f8b724', preferred=True)
+    version('2.7.15', '045fb3440219a1f6923fefdabde63342', preferred=True)
+    version('2.7.14', 'cee2e4b33ad3750da77b2e85f2f8b724')
     version('2.7.13', '17add4bf0ad0ec2f08e0cae6d205c700')
     version('2.7.12', '88d61f82e3616a4be952828b3694109d')
     version('2.7.11', '6b6076ec9e93f05dd63e47eb9c15728b')
@@ -91,6 +94,10 @@ class Python(AutotoolsPackage):
         default=False,
         description='Enable expensive build-time optimizations, if available'
     )
+    # See https://legacy.python.org/dev/peps/pep-0394/
+    variant('pythoncmd', default=True,
+            description="Symlink 'python3' executable to 'python' "
+            "(not PEP 394 compliant)")
 
     depends_on("openssl")
     depends_on("bzip2")
@@ -229,7 +236,7 @@ class Python(AutotoolsPackage):
                 os.symlink(os.path.join(src, f),
                            os.path.join(dst, f))
 
-        if spec.satisfies('@3:'):
+        if spec.satisfies('@3:') and spec.satisfies('+pythoncmd'):
             os.symlink(os.path.join(prefix.bin, 'python3'),
                        os.path.join(prefix.bin, 'python'))
             os.symlink(os.path.join(prefix.bin, 'python3-config'),
@@ -542,7 +549,10 @@ class Python(AutotoolsPackage):
         # where a system provided python is run against the standard libraries
         # of a Spack built python. See issue #7128
         spack_env.set('PYTHONHOME', self.home)
-        spack_env.prepend_path('PATH', os.path.dirname(self.command.path))
+
+        path = os.path.dirname(self.command.path)
+        if not is_system_path(path):
+            spack_env.prepend_path('PATH', path)
 
         python_paths = []
         for d in dependent_spec.traverse(
