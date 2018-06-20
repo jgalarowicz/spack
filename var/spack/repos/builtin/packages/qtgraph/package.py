@@ -40,6 +40,7 @@
 # Place, Suite 330, Boston, MA  02111-1307  USA
 ##############################################################################
 from spack import *
+import os
 
 
 class Qtgraph(QMakePackage):
@@ -71,9 +72,13 @@ class Qtgraph(QMakePackage):
 
         # The implementor has set up the library and include paths in
         # a non-conventional way.  We reflect that here.
+        if os.path.isdir(self.prefix.lib64):
+            lib_dir = self.prefix.lib64
+        else:
+            lib_dir = self.prefix.lib
+
         run_env.prepend_path(
             'LD_LIBRARY_PATH', join_path(
-                self.prefix.lib64,
-                '{0}'.format(self.spec['qt'].version.up_to(3))))
+                lib_dir, '{0}'.format(self.spec['qt'].version.up_to(3))))
 
         run_env.prepend_path('CPATH', self.prefix.include.QtGraph)
